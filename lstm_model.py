@@ -4,6 +4,7 @@ from sklearn.preprocessing import MinMaxScaler
 from utils import read_compact_format
 from keras.models import Model
 from keras.layers import Dense, LSTM, Input, BatchNormalization, Activation, Subtract
+from sklearn.metrics import roc_curve, accuracy_score, f1_score
 
 
 # Create pairs of sequences
@@ -91,6 +92,19 @@ history = model.fit(
 )
 
 # Evaluate the model
-loss, accuracy = model.evaluate([X_test[:, 0], X_test[:, 1]], y_test)
-print(f"Test Loss: {loss}")
+y_pred = model.predict([X_test[:, 0], X_test[:, 1]])
+
+# Compute ROC curve and EER
+fpr, tpr, thresholds = roc_curve(y_test, y_pred)
+eer_threshold = thresholds[np.nanargmin(np.abs(fpr - (1 - tpr)))]
+
+# Convert predictions to binary based on the EER threshold
+y_pred_binary = (y_pred > eer_threshold).astype(int)
+
+# Calculate accuracy and F1 score
+accuracy = accuracy_score(y_test, y_pred_binary)
+f1 = f1_score(y_test, y_pred_binary)
+
+print(f"EER Threshold: {eer_threshold}")
 print(f"Test Accuracy: {accuracy}")
+print(f"Test F1 Score: {f1}")
