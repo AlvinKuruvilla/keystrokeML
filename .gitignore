@@ -1,0 +1,4 @@
+env/
+train_images/
+test_images
+*.dat
