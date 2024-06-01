@@ -2,6 +2,7 @@ import os
 from collections import defaultdict
 import numpy as np
 import pandas as pd
+from rich.progress import track
 
 
 def read_compact_format():
@@ -98,3 +99,64 @@ def map_platform_id_to_initial(platform_id: int):
         raise ValueError(f"Bad platform_id: {platform_id}")
 
     return platform_mapping[platform_id]
+
+
+# TODO: Use the actual Unicode keycode eventually
+# TODO: This is going to be a bad solution when we have to do KIT
+def key_to_keycode(keys, key, use_kit):
+    if use_kit:
+        data = key.split("|*")
+        return str(keys.index(data[0])) + str(keys.index(data[1]))
+    return keys.index(key)
+
+
+def make_into_timeseries_df(use_kit, kit_index=None):
+    data = []
+    df = read_compact_format()
+    all_keys = list(set(df["key"]))
+    all_keys.sort()
+    for i in track(range(1, 26)):
+        if i == 22:
+            continue
+        for j in range(1, 7):
+            for k in range(1, 4):
+                print("User ID:", i)
+                print("Platform ID:", k)
+                print("Session ID:", j)
+                df = read_compact_format()
+                rem = df[
+                    (df["user_ids"] == i)
+                    & (df["session_id"] == j)
+                    & (df["platform_id"] == k)
+                ]
+                if rem.empty:
+                    print(
+                        f"Skipping user_id: {i} and platform id: {map_platform_id_to_initial(k)} and session_id: {j}"
+                    )
+                    continue
+                if use_kit:
+                    if kit_index is not None:
+                        kit = create_kit_data_from_df(rem, kit_index)
+                        for key, timings in kit.items():
+                            entry = {
+                                "user_id": i,
+                                "session_id": j,
+                                "platform_id": k,
+                                "key": key_to_keycode(all_keys, key, True),
+                                "kht_value": np.median(list(timings)),
+                            }
+                            data.append(entry)
+                    else:
+                        raise ValueError()
+                else:
+                    kht = create_kht_data_from_df(rem)
+                    for key, timings in kht.items():
+                        entry = {
+                            "user_id": i,
+                            "session_id": j,
+                            "platform_id": k,
+                            "key": key_to_keycode(all_keys, key, False),
+                            "kht_value": np.median(list(timings)),
+                        }
+                        data.append(entry)
+    return pd.DataFrame(data, columns=list(data[0].keys()))
