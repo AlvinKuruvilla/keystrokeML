@@ -111,7 +111,8 @@ def vgg_feature_extract(directory, model):
     return np.array(features), labels_one_hot
 
 
-clean_directories()
-create_train_images_folder()
-create_test_images_folder()
-validate_folder_split()
+if __name__ == "__main__":
+    clean_directories()
+    create_train_images_folder()
+    create_test_images_folder()
+    validate_folder_split()

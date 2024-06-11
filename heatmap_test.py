@@ -1,4 +1,4 @@
-from heatmap import HeatMap
+from core.heatmap import HeatMap
 from rich.progress import track
 
 heatmap = HeatMap()

@@ -1,5 +1,5 @@
-from rgb import RGBMatrix, validate_image_pixels
-from utils import (
+from core.rgb import RGBMatrix
+from core.utils import (
     create_kit_data_from_df,
     map_platform_id_to_initial,
     read_compact_format,

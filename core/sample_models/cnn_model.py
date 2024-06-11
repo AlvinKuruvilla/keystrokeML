@@ -93,35 +93,35 @@ def build_cnn(num_classes, axis_dim: int):
     return fashion_model
 
 
-IMAGE_DIMENSION = 64
-print(os.path.join(os.getcwd(), "train_images"))
-X_train = resize_images(os.path.join(os.getcwd(), "train_images"), IMAGE_DIMENSION)
-X_test = resize_images(os.path.join(os.getcwd(), "test_images"), IMAGE_DIMENSION)
-X_train, X_test = change_type_and_reshape(X_train, X_test, IMAGE_DIMENSION)
-train_Y_one_hot = get_labels(os.path.join(os.getcwd(), "train_images"))
-test_Y_one_hot = get_labels(os.path.join(os.getcwd(), "test_images"))
+if __name__ == "__main__":
+    IMAGE_DIMENSION = 64
+    print(os.path.join(os.getcwd(), "train_images"))
+    X_train = resize_images(os.path.join(os.getcwd(), "train_images"), IMAGE_DIMENSION)
+    X_test = resize_images(os.path.join(os.getcwd(), "test_images"), IMAGE_DIMENSION)
+    X_train, X_test = change_type_and_reshape(X_train, X_test, IMAGE_DIMENSION)
+    train_Y_one_hot = get_labels(os.path.join(os.getcwd(), "train_images"))
+    test_Y_one_hot = get_labels(os.path.join(os.getcwd(), "test_images"))
 
-train_X, valid_X, train_label, valid_label = train_test_split(
-    X_train, train_Y_one_hot, test_size=0.2, random_state=13
-)
+    train_X, valid_X, train_label, valid_label = train_test_split(
+        X_train, train_Y_one_hot, test_size=0.2, random_state=13
+    )
 
+    print(train_X.shape, valid_X.shape, train_label.shape, valid_label.shape)
+    batch_size = 64
+    epochs = 20
+    num_classes = get_labels(os.path.join(os.getcwd(), "train_images")).shape[1]
+    print(num_classes)
+    print("Number of classes from labels:", train_Y_one_hot.shape[1])
 
-print(train_X.shape, valid_X.shape, train_label.shape, valid_label.shape)
-batch_size = 64
-epochs = 20
-num_classes = get_labels(os.path.join(os.getcwd(), "train_images")).shape[1]
-print(num_classes)
-print("Number of classes from labels:", train_Y_one_hot.shape[1])
-
-fashion_model = build_cnn(num_classes, IMAGE_DIMENSION)
-fashion_train = fashion_model.fit(
-    train_X,
-    train_label,
-    batch_size=batch_size,
-    epochs=epochs,
-    verbose=1,
-    validation_data=(valid_X, valid_label),
-)
-test_eval = fashion_model.evaluate(X_test, test_Y_one_hot, verbose=1)
-print("Test loss:", test_eval[0])
-print("Test accuracy:", test_eval[1])
+    fashion_model = build_cnn(num_classes, IMAGE_DIMENSION)
+    fashion_train = fashion_model.fit(
+        train_X,
+        train_label,
+        batch_size=batch_size,
+        epochs=epochs,
+        verbose=1,
+        validation_data=(valid_X, valid_label),
+    )
+    test_eval = fashion_model.evaluate(X_test, test_Y_one_hot, verbose=1)
+    print("Test loss:", test_eval[0])
+    print("Test accuracy:", test_eval[1])

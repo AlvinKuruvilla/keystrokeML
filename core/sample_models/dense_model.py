@@ -6,7 +6,7 @@ from keras.models import Sequential, Model
 from keras.applications.vgg16 import VGG16
 from PIL import Image
 
-from extractor import (
+from core.extractor import (
     clean_directories,
     create_test_images_folder,
     create_train_images_folder,
@@ -64,10 +64,11 @@ def run_model():
     print(f"Test Accuracy: {test_acc:.3f}")
 
 
-clean_directories()
-create_train_images_folder()
-create_test_images_folder()
-validate_folder_split()
-run_model()
-# train_directory = os.path.join(os.getcwd(), "test_images")
-# dbg_print_image_dimensions(train_directory)
+if __name__ == "__main__":
+    clean_directories()
+    create_train_images_folder()
+    create_test_images_folder()
+    validate_folder_split()
+    run_model()
+    # train_directory = os.path.join(os.getcwd(), "test_images")
+    # dbg_print_image_dimensions(train_directory)

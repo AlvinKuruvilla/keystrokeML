@@ -1,3 +1,4 @@
+import os
 from collections import Counter
 
 
@@ -58,7 +59,7 @@ def peter_norvig_bigrams():
 
 
 def read_word_list():
-    with open("words_alpha.txt") as f:
+    with open(os.path.join(os.getcwd(), "words_alpha.txt")) as f:
         lines = f.readlines()
     return [line.strip() for line in lines]
 
@@ -77,5 +78,6 @@ def sorted_bigrams_frequency(words):
     return sorted(bigram_counts.items(), key=lambda x: x[1], reverse=True)
 
 
-words = read_word_list()
-bigrams = sorted_bigrams_frequency(words)
+if __name__ == "__main__":
+    words = read_word_list()
+    bigrams = sorted_bigrams_frequency(words)

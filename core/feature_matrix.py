@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 
-from bigrams import read_word_list, sorted_bigrams_frequency
+from core.bigrams import read_word_list, sorted_bigrams_frequency
 
 
 def sort_kit_data_by_values_length(data):
