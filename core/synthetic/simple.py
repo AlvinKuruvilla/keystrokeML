@@ -18,10 +18,25 @@ def generate_keystroke_sequence(sequence_length):
 
 def extract_features(df):
     df["HL"] = df["release_time"] - df["press_time"]
-    df["PL"] = df["press_time"].diff().fillna(0)
-    df["RL"] = df["release_time"].diff().fillna(0)
-    df["IL"] = df["press_time"] - df["release_time"].shift(1).fillna(0)
+
+    df["PL"] = df["press_time"].diff()
+    pl_nans = df["PL"].isna().sum()
+    df["PL"] = df["PL"].dropna()
+
+    df["RL"] = df["release_time"].diff()
+    rl_nans = df["RL"].isna().sum()
+    df["RL"] = df["RL"].dropna()
+
+    df["IL"] = df["press_time"] - df["release_time"].shift(1)
+    il_nans = df["IL"].isna().sum()
+    df["IL"] = df["IL"].dropna()
+
+    print(f"Number of NaNs in PL before filling: {pl_nans}")
+    print(f"Number of NaNs in RL before filling: {rl_nans}")
+    print(f"Number of NaNs in IL before filling: {il_nans}")
+
     features = df[["keycode", "HL", "PL", "RL", "IL"]].values
+    print(features)
     return features
 
 
