@@ -3,7 +3,7 @@ import pandas as pd
 from rich.progress import track
 
 # Parameters for synthetic data generation
-num_users = 1000
+num_users = 10
 num_sequences_per_user = 15
 sequence_length = 70  # Number of keystrokes per sequence
 
@@ -14,6 +14,10 @@ def generate_keystroke_sequence(sequence_length):
     press_times = np.cumsum(np.random.uniform(0.05, 0.3, sequence_length))
     release_times = press_times + np.random.uniform(0.05, 0.1, sequence_length)
     return keycodes, press_times, release_times
+
+
+def get_sub_df_by_user_id(df: pd.DataFrame, user_id):
+    return df[df["user_id"] == user_id]
 
 
 def extract_features(df):
@@ -54,6 +58,6 @@ if __name__ == "__main__":
     df = pd.DataFrame(
         data, columns=["user_id", "seq_id", "keycode", "press_time", "release_time"]
     )
-    df.to_csv("dataset/synthetic_keystroke_data.csv", index=False)
+    df.to_csv("dataset/synthetic_keystroke_data_small.csv", index=False)
 
     print("Synthetic dataset created and saved as 'synthetic_keystroke_data.csv'.")
