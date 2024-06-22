@@ -160,3 +160,8 @@ def make_into_timeseries_df(use_kit, kit_index=None):
                         }
                         data.append(entry)
     return pd.DataFrame(data, columns=list(data[0].keys()))
+
+
+def transformer_df_into_feature_vectors(data):
+    # Extract feature columns and convert to numpy array
+    return data.iloc[:, 2:].values
