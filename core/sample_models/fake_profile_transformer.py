@@ -1,5 +1,6 @@
 from itertools import combinations_with_replacement
 import torch
+import pandas as pd
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
@@ -72,38 +73,86 @@ def collate_fn(batch):
 
 # Define a transformer-based model
 class TransformerSiameseModel(nn.Module):
-    def __init__(self, input_dim, d_model, nhead, num_encoder_layers, dim_feedforward):
+    def __init__(
+        self,
+        input_dim,
+        d_model,
+        nhead,
+        num_encoder_layers,
+        dim_feedforward,
+        max_len=5000,
+        dropout=0.1,
+    ):
         super(TransformerSiameseModel, self).__init__()
         self.embedding = nn.Linear(input_dim, d_model)
+
         encoder_layers = nn.TransformerEncoderLayer(
             d_model=d_model,
             nhead=nhead,
             dim_feedforward=dim_feedforward,
+            dropout=dropout,
             batch_first=True,
         )
         self.transformer_encoder = nn.TransformerEncoder(
             encoder_layers, num_layers=num_encoder_layers
         )
+
         self.fc1 = nn.Linear(d_model, 32)
+        self.dropout = nn.Dropout(dropout)
         self.fc2 = nn.Linear(32, 1)
 
+        self.positional_encoding = self._generate_positional_encoding(d_model, max_len)
+
+    def _generate_positional_encoding(self, d_model, max_len):
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2).float()
+            * (-torch.log(torch.tensor(10000.0)) / d_model)
+        )
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        return pe
+
     def forward(self, seq1, seq2):
+        _, seq_len_1, _ = seq1.size()
+        _, seq_len_2, _ = seq2.size()
+
+        # Apply embedding
         seq1 = self.embedding(seq1)
         seq2 = self.embedding(seq2)
-        seq1 = seq1.permute(
-            1, 0, 2
-        )  # Transpose for transformer input (seq_len, batch, feature)
-        seq2 = seq2.permute(
-            1, 0, 2
-        )  # Transpose for transformer input (seq_len, batch, feature)
+
+        # Add positional encoding
+        seq1 = seq1 + self.positional_encoding[:, :seq_len_1, :].to(seq1.device)
+        seq2 = seq2 + self.positional_encoding[:, :seq_len_2, :].to(seq2.device)
+
+        # Transform sequences
         transformed_seq1 = self.transformer_encoder(seq1)
         transformed_seq2 = self.transformer_encoder(seq2)
-        transformed_seq1 = transformed_seq1.mean(dim=0)  # Average over sequence length
-        transformed_seq2 = transformed_seq2.mean(dim=0)  # Average over sequence length
+
+        # Average over sequence length
+        transformed_seq1 = transformed_seq1.mean(dim=1)
+        transformed_seq2 = transformed_seq2.mean(dim=1)
+
+        # Compute distance and classify
         distance = torch.abs(transformed_seq1 - transformed_seq2)
         x = torch.relu(self.fc1(distance))
+        x = self.dropout(x)
         output = torch.sigmoid(self.fc2(x))
         return output
+
+
+def prepare_transformer_train_test_data(df):
+    ids = [num for num in range(1, 26) if num != 22]
+    train = []
+    test = []
+    for user_id in ids:
+        user_data = df[(df["user_ids"] == user_id)]
+        split_index = len(user_data) // 2
+        train.append(user_data.iloc[:split_index])
+        test.append(user_data.iloc[split_index:])
+    return (pd.concat(train), pd.concat(test))
 
 
 # Define a simpler model

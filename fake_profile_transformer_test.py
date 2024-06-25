@@ -9,6 +9,7 @@ from core.sample_models.fake_profile_transformer import (
     SimpleSiameseModel,
     TransformerSiameseModel,
     collate_fn,
+    prepare_transformer_train_test_data,
 )
 from core.utils import create_kht_data_from_df, create_kit_data_from_df
 from torch.utils.data import DataLoader
@@ -72,11 +73,7 @@ new_keystroke_pair_dataset = NewKeystrokePairDataset(new_keystroke_data)
 new_keystroke_pair_dataloader = DataLoader(
     new_keystroke_pair_dataset, batch_size=4, shuffle=False, collate_fn=collate_fn
 )
-# Split the dataset into training and validation sets
-# TODO: Instead of splitting this way we should get the dataframe per user_id and split it in half and combine it that way.
-#       That's going to make it tricky to remove the indices to make the validation set
-train_data = new_keystroke_data.sample(frac=0.5, random_state=42)
-val_data = new_keystroke_data.drop(train_data.index)
+train_data, val_data = prepare_transformer_train_test_data(new_keystroke_data)
 
 train_dataset = NewKeystrokePairDataset(train_data)
 val_dataset = NewKeystrokePairDataset(val_data)
