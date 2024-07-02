@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import pandas as pd
 from torch import nn
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from transformers import BertModel, BertTokenizer
 
 
@@ -31,15 +31,27 @@ class KeystrokeFeatureExtractorModel(nn.Module):
         pretrained_model_name="bert-base-uncased",
         hidden_size=768,
         num_features=128,
+        dropout_rate=0.3,
     ):
         super(KeystrokeFeatureExtractorModel, self).__init__()
         self.bert = BertModel.from_pretrained(pretrained_model_name)
-        self.feature_extractor = nn.Linear(hidden_size, num_features)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(hidden_size, hidden_size // 2)
+        self.batch_norm1 = nn.BatchNorm1d(hidden_size // 2)
+        self.fc2 = nn.Linear(hidden_size // 2, num_features)
+        self.batch_norm2 = nn.BatchNorm1d(num_features)
 
     def forward(self, input_ids, attention_mask):
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         cls_output = outputs.last_hidden_state[:, 0, :]  # Take the CLS token output
-        features = self.feature_extractor(cls_output)
+        x = self.dropout(cls_output)
+        x = self.fc1(x)
+        x = self.batch_norm1(x)
+        x = torch.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.batch_norm2(x)
+        features = torch.relu(x)
         return features
 
 
@@ -52,8 +64,12 @@ def preprocess_data(data):
         lambda x: " ".join(x)
     )  # Convert keystroke sequences to space-separated strings
     encodings = tokenizer(texts.tolist(), truncation=True, padding=True)
-    data["input_ids"] = encodings["input_ids"]
-    data["attention_mask"] = encodings["attention_mask"]
+
+    # Use .assign to avoid SettingWithCopyWarning
+    data = data.assign(
+        input_ids=encodings["input_ids"], attention_mask=encodings["attention_mask"]
+    )
+
     return data
 
 
@@ -73,3 +89,18 @@ def extract_features(dataloader, model):
     num_features = features.shape[1]
     columns = [f"tf{i}" for i in range(num_features)]
     return pd.DataFrame(features, columns=columns)
+
+
+def get_transformer_features(df: pd.DataFrame) -> pd.DataFrame:
+    # Preprocess the data
+    preprocessed_data = preprocess_data(df)
+
+    # Create the dataset and dataloader
+    dataset = KeystrokeDataset(preprocessed_data)
+    dataloader = DataLoader(dataset, batch_size=16, shuffle=False)
+
+    # Instantiate the model
+    model = KeystrokeFeatureExtractorModel()
+
+    # Extract features from the dataset
+    return extract_features(dataloader, model)
