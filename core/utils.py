@@ -165,3 +165,79 @@ def make_into_timeseries_df(use_kit, kit_index=None):
 def transformer_df_into_feature_vectors(data):
     # Extract feature columns and convert to numpy array
     return data.iloc[:, 2:].values
+
+
+def create_kit_features_combined(df):
+    kit_feature_types = [1, 2, 3, 4]
+    kit_features_combined = defaultdict(list)
+
+    for kit_feature_type in kit_feature_types:
+        kit_features = create_kit_data_from_df(df, kit_feature_type, False)
+        for key, values in kit_features.items():
+            combined_key = f"{key}_type_{kit_feature_type}"
+            kit_features_combined[combined_key] = values
+
+    return kit_features_combined
+
+
+def get_df_by_user_id(df: pd.DataFrame, user_id):
+    return df[df["user_ids"] == user_id]
+
+
+def all_ids():
+    return [num for num in range(1, 26) if num != 22]
+
+
+def create_feature_dataframe(df, kht_func, kit_func, feature_types):
+    """
+    Create a dataframe with the features using KHT and KIT data.
+
+    Parameters:
+    - df (pandas.DataFrame): Input dataframe with columns "key", "press_time", and "release_time".
+    - kht_func (function): Function to compute Key Hold Time (KHT) data.
+    - kit_func (function): Function to compute Key Interval Time (KIT) data.
+    - feature_types (list of int): List of KIT feature types to compute.
+
+    Returns:
+    - pandas.DataFrame: Dataframe with computed features.
+    """
+    feature_rows = []
+
+    for i in range(len(df) - 1):
+        # Extract the relevant part of the dataframe for the current sample
+        sample_df = df.iloc[i : i + 2]
+
+        # Compute KHT data for the sample
+        kht_data = kht_func(sample_df)
+
+        # Compute KIT data for the sample
+        kit_data = {}
+        for feature_type in feature_types:
+            kit_data.update(kit_func(sample_df, feature_type))
+
+        # Flatten the KHT and KIT data into a list of features for the current sample
+        sample_features = []
+        for key, values in kht_data.items():
+            sample_features.extend(values)
+        for key, values in kit_data.items():
+            sample_features.extend(values)
+
+        # Append the sample's features to the list of feature rows
+        feature_rows.append(sample_features)
+
+    # Determine the maximum number of features
+    max_features = max(len(features) for features in feature_rows)
+
+    # Create a dataframe with the features
+    feature_columns = [f"tf{i}" for i in range(max_features)]
+    feature_df = pd.DataFrame(feature_rows, columns=feature_columns)
+
+    return feature_df
+
+
+def get_features_dataframe(df: pd.DataFrame):
+    feature_types = [1, 2, 3, 4]  # Specify the KIT feature types to compute
+
+    return create_feature_dataframe(
+        df, create_kht_data_from_df, create_kit_data_from_df, feature_types
+    )
