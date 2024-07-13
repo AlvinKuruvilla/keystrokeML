@@ -72,7 +72,7 @@ def find_pairs(data: pd.DataFrame, filename: str):
         if current_seq == sequence:
             session_id += 1
             current_seq = []  # Reset the current sequence after a match
-        print(current_seq)
+        # print(current_seq)
     # Convert session_id to integer type
     df["session_id"] = df["session_id"].astype(int)
     return df

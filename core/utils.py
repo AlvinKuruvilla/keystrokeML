@@ -1,4 +1,5 @@
 import os
+import json
 from collections import defaultdict
 import numpy as np
 import pandas as pd
@@ -17,6 +18,28 @@ def read_compact_format():
             "user_ids": np.uint8,
         },
     )
+    return df
+
+
+def read_compact_format_with_gender():
+    df = pd.read_csv(
+        os.path.join(os.getcwd(), "dataset", "cleaned2.csv"),
+        dtype={
+            "key": str,
+            "press_time": np.float64,
+            "release_time": np.float64,
+            "platform_id": np.uint8,
+            "session_id": np.uint8,
+            "user_ids": np.uint8,
+        },
+    )
+    ids = list(df["user_ids"])
+    genders = []
+    with open(os.path.join(os.getcwd(), "genders.json"), "r") as f:
+        data = json.load(f)
+    for uid in ids:
+        genders.append(data[str(uid)])
+    df["genders"] = genders
     return df
 
 
