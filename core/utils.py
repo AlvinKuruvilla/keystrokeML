@@ -207,6 +207,88 @@ def get_df_by_user_id(df: pd.DataFrame, user_id):
     return df[df["user_ids"] == user_id]
 
 
+def get_user_by_platform(user_id, platform_id, session_id=None):
+    """
+    Retrieve data for a given user and platform, with an optional session_id filter.
+
+    Parameters:
+    - user_id (int): Identifier for the user.
+    - platform_id (int or list[int]): Identifier for the platform.
+      If provided as a list, it should contain two integers specifying
+      an inclusive range to search between.
+    - session_id (int or list[int], optional): Identifier for the session.
+      If provided as a list, it can either specify an inclusive range with
+      two integers or provide multiple session IDs to filter by.
+
+    Returns:
+    - DataFrame: Filtered data matching the given criteria.
+
+    Notes:
+    - When providing a list for platform_id or session_id to specify a range,
+      the order of the two integers does not matter.
+    - When providing a list with more than two integers for session_id,
+      it will filter by those exact session IDs.
+
+    Raises:
+    - AssertionError: If platform_id or session_id list does not follow the expected format.
+
+    Examples:
+    >>> df = get_user_by_platform(123, 1)
+    >>> df = get_user_by_platform(123, [1, 5])
+    >>> df = get_user_by_platform(123, 1, [2, 6])
+    >>> df = get_user_by_platform(123, 1, [2, 3, 4])
+
+    """
+    # Get all of the data for a user amd platform with am optional session_id
+
+    # print(f"user_id:{user_id}", end=" | ")
+    df = read_compact_format()
+    if session_id is None:
+        if isinstance(platform_id, list):
+            # Should only contain an inclusive range of the starting id and ending id
+            assert len(platform_id) == 2
+            if platform_id[0] < platform_id[1]:
+                return df[
+                    (df["user_ids"] == user_id)
+                    & (df["platform_id"].between(platform_id[0], platform_id[1]))
+                ]
+            else:
+                return df[
+                    (df["user_ids"] == user_id)
+                    & (df["platform_id"].between(platform_id[1], platform_id[0]))
+                ]
+
+        return df[(df["user_ids"] == user_id) & (df["platform_id"] == platform_id)]
+    if isinstance(session_id, list):
+        # Should only contain an inclusive range of the starting id and ending id
+        if len(session_id) == 2:
+            return df[
+                (df["user_ids"] == user_id)
+                & (df["platform_id"] == platform_id)
+                & (df["session_id"].between(session_id[0], session_id[1]))
+            ]
+        elif len(session_id) > 2:
+            test = df[
+                (df["user_ids"] == user_id)
+                & (df["platform_id"] == platform_id)
+                & (df["session_id"].isin(session_id))
+            ]
+            # print(session_id)
+            # print(test["session_id"].unique())
+            # input()
+            return df[
+                (df["user_ids"] == user_id)
+                & (df["platform_id"] == platform_id)
+                & (df["session_id"].isin(session_id))
+            ]
+
+    return df[
+        (df["user_ids"] == user_id)
+        & (df["platform_id"] == platform_id)
+        & (df["session_id"] == session_id)
+    ]
+
+
 def all_ids():
     return [num for num in range(1, 26) if num != 22]
 
