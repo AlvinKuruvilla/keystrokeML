@@ -74,9 +74,9 @@ class SentenceParser:
         elif as_list is False:
             return remove_invalid_keystrokes(self.as_df())
 
-    def get_words(self, data_df):
+    def get_words(self, letters):
         tokenized_words = []
-        sentences = self.make_sentences(data_df)
+        sentences = reconstruct_text(letters)
         nlp = spacy.load("en_core_web_sm")
         doc = nlp(sentences)
         for token in doc:

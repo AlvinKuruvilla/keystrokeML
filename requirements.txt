@@ -4,3 +4,10 @@ scikit-learn
 Pillow
 tensorflow
 rich
+spacy
+nltk
+taaled
+sentence-transformers
+gensim
+POT
+tensorflow-hub
