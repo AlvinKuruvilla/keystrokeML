@@ -224,10 +224,10 @@ def deft(key1, key2):
         key2 = "'"
 
     if key1 == ' "" ""':
-        print("Weird quote case")
+        # print("Weird quote case")
         key1 = '"'
     elif key2 == ' "" ""':
-        print("Weird quote case")
+        # print("Weird quote case")
         key2 = '"'
     if key1 == '"" ""':
         print("Other weird quote case")
@@ -286,10 +286,17 @@ def flatten_list(nested_list):
 def find_avg_deft_for_deft_distance_and_kit_feature(df, deft_distance, feature_type):
     kit_data = create_kit_data_from_df(df, feature_type)
     kit_keys = list(kit_data.keys())
-
     matches = []
     for kit_key in kit_keys:
         key1, key2 = kit_key.split("|*")
         if deft(key1, key2) == deft_distance:
             matches.append(kit_data[kit_key])
-    return statistics.mean(flatten_list(matches))
+    # print("RAW:", matches)
+    # print()
+    flat_matches = flatten_list(matches)
+    # print("FLAT:", flat_matches)
+    if len(matches) == 0:
+        print("****** NO MATCHES FOUND - investigate further **********")
+        print(df)
+        return 0
+    return statistics.mean(flat_matches)
