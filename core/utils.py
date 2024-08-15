@@ -1,11 +1,33 @@
 import os
+import re
 import json
 from collections import defaultdict
 import numpy as np
 import pandas as pd
 from rich.progress import track
+from functools import cache
 
 
+def clean_string(s):
+    # Remove extraneous single quotes and retain the actual content
+    cleaned = re.sub(r"'\s*|\s*'", "", s)
+
+    # Remove any extra spaces
+    return cleaned.strip()
+
+
+def clean_strings(strings):
+    cleaned_strings = []
+
+    for s in strings:
+        cleaned = clean_string(s)
+        # Append the cleaned string to the result list
+        cleaned_strings.append(cleaned)
+
+    return cleaned_strings
+
+
+@cache
 def read_compact_format():
     df = pd.read_csv(
         os.path.join(os.getcwd(), "dataset", "cleaned2.csv"),
@@ -88,6 +110,9 @@ def create_kit_data_from_df(df, kit_feature_type, use_seperator: bool = True):
     the results by key pair. The method for computing the KIT is determined by the `kit_feature_type` parameter.
     """
     kit_dict = defaultdict(list)
+    # print("Feature type:", kit_feature_type)
+    if kit_feature_type not in range(1, 5):
+        raise ValueError(f"Bad kit feature type {kit_feature_type}")
     if df.empty:
         # print("dig deeper: dataframe is empty!")
         return kit_dict
@@ -99,7 +124,7 @@ def create_kit_data_from_df(df, kit_feature_type, use_seperator: bool = True):
             if use_seperator:
                 key = current_row["key"] + "|*" + next_row["key"]
             else:
-                key = current_row["key"] + next_row["key"]
+                key = clean_string(current_row["key"] + next_row["key"])
             initial_press = float(current_row["press_time"])
             second_press = float(next_row["press_time"])
             initial_release = float(current_row["release_time"])
