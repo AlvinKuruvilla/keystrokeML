@@ -58,6 +58,40 @@ def peter_norvig_bigrams():
     ]
 
 
+# https://mathcenter.oxford.emory.edu/site/math125/englishLetterFreqs/
+def oxford_bigrams():
+    return [
+        "th",
+        "he",
+        "in",
+        "en",
+        "nt",
+        "re",
+        "er",
+        "an",
+        "ti",
+        "es",
+        "on",
+        "at",
+        "se",
+        "nd",
+        "or",
+        "ar",
+        "al",
+        "te",
+        "co",
+        "de",
+        "to",
+        "ra",
+        "et",
+        "ed",
+        "it",
+        "sa",
+        "em",
+        "ro",
+    ]
+
+
 def read_word_list():
     with open(os.path.join(os.getcwd(), "words_alpha.txt")) as f:
         lines = f.readlines()
@@ -68,6 +102,7 @@ def generate_bigrams(words):
     """Generate bigrams from a list of words and count their frequency."""
     bigrams = []
     for word in words:
+        word = str(word)
         bigrams.extend([word[i : i + 2] for i in range(len(word) - 1)])
     return Counter(bigrams)
 
