@@ -1,6 +1,7 @@
 import enum
 import random
 import statistics
+import scipy.stats as stats
 from functools import cache
 import pandas as pd
 import numpy as np
@@ -117,6 +118,13 @@ def only_platform_id(df: pd.DataFrame, platform_id):
     return df[df["platform_id"].apply(lambda x: x[0]) == platform_id]
 
 
+def only_platform_and_user_id(df: pd.DataFrame, platform_id, user_id):
+    return df[
+        (df["platform_id"].apply(lambda x: x[0]) == platform_id)
+        & (df["user_id"] == user_id)
+    ]
+
+
 def fill_empty_row_values(df: pd.DataFrame, ckps):
     cols = df.columns
     diffs = []
@@ -136,24 +144,58 @@ def compute_fixed_feature_values(lst):
     if len(lst) < 2:
         # This is just a way to make all of the KIT feature columns have the same length at the end
         # we can revert this back to just return the single element if we want to
-        return [lst[0], lst[0], lst[0], lst[0], lst[0]]
-        # return lst
+        # return [lst[0], lst[0], lst[0], lst[0], lst[0]]
+        return [
+            lst[0],
+            lst[0],
+            lst[0],
+            lst[0],
+            lst[0],
+            lst[0],
+            lst[0],
+            lst[0],
+            lst[0],
+            lst[0],
+            # lst[0],
+            # lst[0],
+            # lst[0],
+            # lst[0],
+            # lst[0],
+            # lst[0],
+            # lst[0],
+            # lst[0],
+        ]
 
     # Convert to numpy array for convenience
     arr = np.array(lst)
     # Return the statistics as a list
-    return [np.min(arr), np.max(arr), np.median(arr), np.mean(arr), np.std(arr)]
+    return [
+        np.min(arr),
+        np.max(arr),
+        np.median(arr),
+        np.mean(arr),
+        np.std(arr),
+        np.quantile(arr, 0.25),  # 1st quartile
+        np.quantile(arr, 0.75),  # 3rd quartile
+        np.quantile(arr, 0.75) - np.quantile(arr, 0.25),  # IQR
+        stats.skew(arr),  # Skew
+        stats.kurtosis(arr),  # Kurtosis
+        # np.max(arr) - np.min(arr),  # Range
+        # np.std(arr) / np.mean(arr),  # Coefficient of Variation
+        # np.var(arr),  # Variance
+        # stats.entropy(np.histogram(arr, bins=10)[0]),  # Entropy
+        # np.sqrt(np.mean(arr**2)),  # Root Mean Square
+        # np.sum(arr**2),  # Energy
+        # np.mean(arr) / np.std(arr),  # Signal-to-Noise Ratio
+        # np.correlate(arr, arr, mode="full")[len(arr) - 1 :],  # Autocorrelation
+    ]
 
 
 def flatten_kit_feature_columns(df: pd.DataFrame, ckps):
     cols = df.columns
     for col in cols:
         if col in ckps:
-            df[col] = df[col].apply(
-                lambda x: compute_fixed_feature_values(x)
-                if isinstance(x, list) and len(x) >= 2
-                else x
-            )
+            df[col] = df[col].apply(lambda x: compute_fixed_feature_values(x))
     return df
 
 
@@ -170,7 +212,7 @@ def drop_empty_list_columns(df):
 
 
 def read_norvig_words(n=15):
-    df = pd.read_csv("peter_norvig_words.txt", delim_whitespace=True, header=None)
+    df = pd.read_csv("peter_norvig_words.txt", sep="\s+", header=None)
     # Extract the first column
     words = list(df[0])
     count = 0

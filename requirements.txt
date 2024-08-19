@@ -11,3 +11,4 @@ sentence-transformers
 gensim
 POT
 tensorflow-hub
+faiss-cpu
