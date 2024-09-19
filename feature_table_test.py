@@ -1,96 +1,113 @@
-import pandas as pd
-from tqdm import tqdm
+import numpy as np
+from sklearn.metrics import top_k_accuracy_score
 from core.deft import flatten_list
+from core.faiss_utils import faiss_similarity
+from core.feature_heatmap import FeatureHeatMap
 from core.feature_table import (
-    KeystrokeFeatureTable,
-    fill_empty_row_values,
-    get_ckps,
-    flatten_kit_feature_columns,
+    create_full_user_and_platform_table,
     CKP_SOURCE,
-    drop_empty_list_columns,
     only_user_id,
+    table_to_cleaned_df,
 )
-from core.utils import all_ids, get_user_by_platform, map_platform_id_to_initial
-from tester import faiss_similarity
+from core.utils import all_ids
 
-
-def is_empty_list(x):
-    return isinstance(x, list) and len(x) == 0
-
-
-rows = []
 source = CKP_SOURCE.NORVIG
 
 
-def test_with_sessions():
-    for i in tqdm(all_ids()):
-        for j in range(1, 4):
-            for k in range(1, 7):
-                df = get_user_by_platform(i, j, k)
-                if df.empty:
-                    print(
-                        f"Skipping User: {i}, platform: {map_platform_id_to_initial(j)}, session: {k}"
-                    )
-                    continue
-                print(
-                    f"User: {i}, platform: {map_platform_id_to_initial(j)}, session: {k}"
-                )
-                table = KeystrokeFeatureTable()
-                table.find_kit_from_most_common_keypairs(df, CKP_SOURCE.OXFORD_EMORY)
-                table.find_deft_for_df(df=df)
-                table.add_user_platform_session_identifiers(i, j, k)
-
-                row = table.as_df()
-                rows.append(row)
-    combined_df = pd.concat(rows, axis=0)
-    print(combined_df.columns)
-    empty_list_count = combined_df.stack().map(is_empty_list).sum()
-    print(f"Number of cells containing empty lists: {empty_list_count}")
-    # print(list(only_platform_id(combined_df, 1)))
-    full_df = fill_empty_row_values(combined_df, get_ckps(source))
-    empty_list_count = full_df.stack().map(is_empty_list).sum()
-    print(f"Number of cells containing empty lists (post fill): {empty_list_count}")
-    fixed_df = flatten_kit_feature_columns(full_df, get_ckps(source))
-    print(drop_empty_list_columns(fixed_df))
-
-
 def test_with_whole_platform():
-    for i in tqdm(all_ids()):
-        for j in range(1, 4):
-            df = get_user_by_platform(i, j)
-            if df.empty:
-                print(f"Skipping User: {i}, platform: {map_platform_id_to_initial(j)}")
-                continue
-            print(f"User: {i}, platform: {map_platform_id_to_initial(j)}")
-            table = KeystrokeFeatureTable()
-            table.find_kit_from_most_common_keypairs(df, source)
-            # table.find_deft_for_df(df=df)
-            table.add_user_platform_session_identifiers(i, j, None)
+    rows = create_full_user_and_platform_table(source)
+    cleaned = table_to_cleaned_df(rows, source)
+    matrix = []
 
-            row = table.as_df()
-            rows.append(row)
+    # Extract features for Facebook and Instagram
+    user_ids = all_ids()
+    facebook_features = []
+    instagram_features = []
 
-    combined_df = pd.concat(rows, axis=0)
-    print(combined_df.columns)
-    empty_list_count = combined_df.stack().map(is_empty_list).sum()
-    print(f"Number of cells containing empty lists: {empty_list_count}")
-    full_df = fill_empty_row_values(combined_df, get_ckps(source))
-    empty_list_count = full_df.stack().map(is_empty_list).sum()
-    print(f"Number of cells containing empty lists (post fill): {empty_list_count}")
-    fixed_df = flatten_kit_feature_columns(full_df, get_ckps(source))
-    cleaned = drop_empty_list_columns(fixed_df)
-    for x in tqdm(all_ids()):
-        for y in tqdm(all_ids()):
-            user1 = only_user_id(cleaned, x).iloc[0].to_dict()
-            user1.pop("user_id", None)
-            user1.pop("platform_id", None)
-            user1 = flatten_list(list(user1.values()))
-            user2 = only_user_id(cleaned, y).iloc[0].to_dict()
-            user2.pop("user_id", None)
-            user2.pop("platform_id", None)
-            user2 = flatten_list(list(user2.values()))
-            score = faiss_similarity(user1, user2)
-            print(f"FAISS similarity score for user {x} and {y}: {score}")
+    for x in user_ids:
+        user_data = only_user_id(cleaned, x)
+        num_rows = len(user_data)
+        print("Number of platforms are: ", num_rows)
+
+        if (
+            num_rows >= 2
+        ):  # Ensure there are at least two platforms (Facebook and Instagram)
+            # Get Facebook platform features (first row)
+            facebook_data = user_data.iloc[0].to_dict()
+            facebook_data.pop("user_id", None)
+            facebook_data.pop("platform_id", None)
+            facebook_feature_vector = flatten_list(list(facebook_data.values()))
+            print(facebook_feature_vector)
+            input("Feature vector")
+            facebook_features.append(facebook_feature_vector)
+
+            # Get Instagram platform features (second row)
+            instagram_data = user_data.iloc[0].to_dict()
+            instagram_data.pop("user_id", None)
+            instagram_data.pop("platform_id", None)
+            instagram_feature_vector = flatten_list(list(instagram_data.values()))
+            instagram_features.append(instagram_feature_vector)
+
+    # Compute FAISS similarity between Facebook and Instagram features
+    for i, fb_vector in enumerate(facebook_features):
+        row = []
+        for j, ig_vector in enumerate(instagram_features):
+            score = faiss_similarity(fb_vector, ig_vector)
+            row.append(score)
+        matrix.append(row)
+
+    # Plotting the heatmap
+    fmap = FeatureHeatMap(source)
+    fmap.plot_heatmap(
+        matrix,
+        "Norvig_FAISS_Facebook_vs_Instagram_similarity_heatmap",
+        "Facebook User Index",
+        "Instagram User Index",
+    )
+
+    return matrix
 
 
-test_with_whole_platform()
+def top_k_analysis(k_values=[1, 2, 3, 4, 5]):
+    # Step 1: Create and clean the data table
+    rows = create_full_user_and_platform_table(source)
+    cleaned = table_to_cleaned_df(rows, source)
+
+    # Step 2: Prepare data for similarity calculation
+    user_ids = all_ids()
+    user_vectors = []
+
+    # Populate vectors
+    for x in user_ids:
+        user1 = only_user_id(cleaned, x).iloc[0].to_dict()
+        user1.pop("user_id", None)
+        user1.pop("platform_id", None)
+        user1_vector = flatten_list(list(user1.values()))
+        user_vectors.append((x, user1_vector))
+
+    # Step 3: Calculate similarity scores
+    n_users = len(user_vectors)
+    similarities = np.zeros((n_users, n_users))
+
+    for i, (user_id1, user1_vector) in enumerate(user_vectors):
+        for j, (user_id2, user2_vector) in enumerate(user_vectors):
+            if i != j:
+                similarities[i, j] = faiss_similarity(user1_vector, user2_vector)
+            else:
+                similarities[i, j] = 1.0  # Self-similarity should be highest
+
+    # Step 4: Prepare for top-k accuracy calculation
+    y_true = np.array(user_ids)
+    y_pred = np.argsort(similarities, axis=1)[::-1]
+
+    # Step 5: Calculate top-k accuracy for each k
+    top_k_accuracies = {}
+    for k in k_values:
+        top_k_accuracies[k] = top_k_accuracy_score(y_true, y_pred, k=k)
+
+    return top_k_accuracies
+
+
+print(test_with_whole_platform())
+# top_k_accuracies = top_k_analysis()
+# print(top_k_accuracies)

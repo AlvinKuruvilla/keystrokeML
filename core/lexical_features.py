@@ -143,3 +143,15 @@ def lsa_similarity(text1, text2):
     # Compute cosine similarity
     cosine_sim = cosine_similarity(lsa_matrix[0:1], lsa_matrix[1:2])
     return cosine_sim[0][0]
+
+
+def extract_stylometric_features(sentence):
+    # Example features: sentence length, average word length, punctuation frequency
+    features = []
+    features.append(len(sentence))  # Sentence length
+    words = sentence.split()
+    avg_word_length = np.mean([len(word) for word in words])
+    features.append(avg_word_length)  # Average word length
+    punctuation_count = sum([1 for char in sentence if char in ",.;!?"])
+    features.append(punctuation_count)  # Punctuation count
+    return np.array(features)

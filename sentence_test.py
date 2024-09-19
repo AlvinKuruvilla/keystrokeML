@@ -67,12 +67,18 @@ def simple_wmd():
 
 
 def full_wmd():
+    ids = all_ids()  # Assuming this returns a list of user IDs
+    n = len(ids)
+
+    # Initialize an empty matrix for similarity scores
+    similarity_matrix = np.zeros((n, n))
+
     sp = SentenceParser(os.path.join(os.getcwd(), "cleaned2.csv"))
     raw_data = read_compact_format()
-    for uid in all_ids():
-        for other in all_ids():
-            df = get_df_by_user_id(raw_data, uid)
-            df2 = get_df_by_user_id(raw_data, other)
+    for i, uid in enumerate(all_ids()):
+        for j, other in enumerate(all_ids()):
+            df = get_user_by_platform_from_df(raw_data, uid, 1)
+            df2 = get_user_by_platform_from_df(raw_data, other, 2)
             key_set = list(df["key"])
             key_set2 = list(df2["key"])
             words = sp.get_words(key_set)
@@ -80,6 +86,17 @@ def full_wmd():
             print(
                 f"User {uid} and {other}:", float(word_movers_distance(words, words2))
             )
+            # WMD measures dissimilarity
+            similarity = float(word_movers_distance(words, words2))
+            similarity_matrix[i, j] = similarity
+    similarity_df = pd.DataFrame(similarity_matrix, index=ids, columns=ids)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(similarity_df, fmt=".2f")
+    plt.title("WMD FI Heatmap")
+    plt.xlabel("User ID")
+    plt.ylabel("User ID")
+    plt.savefig("WMD FI Heatmap.png")
+    plt.show()
 
 
 def simple_use_similarity():
@@ -290,9 +307,4 @@ def recon_test():
             print()
 
 
-sp = SentenceParser(os.path.join(os.getcwd(), "cleaned2.csv"))
-df = get_user_by_platform(1, 1, 3)
-print(df)
-key_set = list(df["key"])
-text = sp.as_sentence(key_set)
-print(text)
+full_wmd()

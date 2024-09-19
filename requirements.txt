@@ -12,3 +12,4 @@ gensim
 POT
 tensorflow-hub
 faiss-cpu
+xgboost

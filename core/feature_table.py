@@ -1,14 +1,27 @@
 import enum
 import random
 import statistics
-import scipy.stats as stats
 from functools import cache
 import pandas as pd
 import numpy as np
 from collections import defaultdict
-from core.bigrams import oxford_bigrams, read_word_list, sorted_bigrams_frequency
+
+from tqdm import tqdm
+from core.bigrams import (
+    oxford_bigrams,
+    read_norvig_words,
+    read_word_list,
+    sorted_bigrams_frequency,
+)
 from core.deft import find_avg_deft_for_deft_distance_and_kit_feature, flatten_list
-from core.utils import clean_string, create_kit_data_from_df, read_compact_format
+from core.utils import (
+    all_ids,
+    clean_string,
+    create_kit_data_from_df,
+    get_user_by_platform,
+    map_platform_id_to_initial,
+    read_compact_format,
+)
 
 
 class CKP_SOURCE(enum.Enum):
@@ -16,6 +29,10 @@ class CKP_SOURCE(enum.Enum):
     ALPHA_WORDS = 1
     OXFORD_EMORY = 2
     NORVIG = 3
+
+
+def is_empty_list(x):
+    return isinstance(x, list) and len(x) == 0
 
 
 # TODO: We need a more algorithmic approach to finding the smallest possible set of common keypairs which does not give any empty sub-arrays
@@ -121,7 +138,15 @@ def only_platform_id(df: pd.DataFrame, platform_id):
 def only_platform_and_user_id(df: pd.DataFrame, platform_id, user_id):
     return df[
         (df["platform_id"].apply(lambda x: x[0]) == platform_id)
-        & (df["user_id"] == user_id)
+        & (df["user_id"].apply(lambda x: x[0]) == user_id)
+    ]
+
+
+def by_platform_user_and_session_id(df: pd.DataFrame, platform_id, user_id, session_id):
+    return df[
+        (df["platform_id"].apply(lambda x: x[0]) == platform_id)
+        & (df["user_id"].apply(lambda x: x[0]) == user_id)
+        & (df["session_id"].apply(lambda x: x[0]) == session_id)
     ]
 
 
@@ -132,7 +157,7 @@ def fill_empty_row_values(df: pd.DataFrame, ckps):
         if col in ckps:
             flat_data = flatten_list(list(df[col]))
             data = statistics.mean(flatten_list(list(df[col])))
-            print(data)
+            # print(data)
             for element in flat_data:
                 diffs.append(element - data)
             replacement_value = random.uniform(min(diffs), max(diffs))
@@ -151,11 +176,10 @@ def compute_fixed_feature_values(lst):
             lst[0],
             lst[0],
             lst[0],
-            lst[0],
-            lst[0],
-            lst[0],
-            lst[0],
-            lst[0],
+            # lst[0],
+            # lst[0],
+            # lst[0],
+            # lst[0],
             # lst[0],
             # lst[0],
             # lst[0],
@@ -175,11 +199,11 @@ def compute_fixed_feature_values(lst):
         np.median(arr),
         np.mean(arr),
         np.std(arr),
-        np.quantile(arr, 0.25),  # 1st quartile
-        np.quantile(arr, 0.75),  # 3rd quartile
-        np.quantile(arr, 0.75) - np.quantile(arr, 0.25),  # IQR
-        stats.skew(arr),  # Skew
-        stats.kurtosis(arr),  # Kurtosis
+        # np.quantile(arr, 0.25),  # 1st quartile
+        # np.quantile(arr, 0.75),  # 3rd quartile
+        # np.quantile(arr, 0.75) - np.quantile(arr, 0.25),  # IQR
+        # stats.skew(arr),  # Skew
+        # stats.kurtosis(arr),  # Kurtosis
         # np.max(arr) - np.min(arr),  # Range
         # np.std(arr) / np.mean(arr),  # Coefficient of Variation
         # np.var(arr),  # Variance
@@ -187,7 +211,6 @@ def compute_fixed_feature_values(lst):
         # np.sqrt(np.mean(arr**2)),  # Root Mean Square
         # np.sum(arr**2),  # Energy
         # np.mean(arr) / np.std(arr),  # Signal-to-Noise Ratio
-        # np.correlate(arr, arr, mode="full")[len(arr) - 1 :],  # Autocorrelation
     ]
 
 
@@ -211,15 +234,80 @@ def drop_empty_list_columns(df):
     return df_dropped
 
 
-def read_norvig_words(n=15):
-    df = pd.read_csv("peter_norvig_words.txt", sep="\s+", header=None)
-    # Extract the first column
-    words = list(df[0])
-    count = 0
-    bigrams = []
-    bigram_frequencies = sorted_bigrams_frequency(words)
-    for bigram, _ in bigram_frequencies:
-        if count == n:
-            return bigrams
-        bigrams.append(bigram)
-        count += 1
+def table_to_cleaned_df(table, source: CKP_SOURCE):
+    combined_df = pd.concat(table, axis=0)
+    print(combined_df.columns)
+    empty_list_count = combined_df.stack().map(is_empty_list).sum()
+    print(f"Number of cells containing empty lists: {empty_list_count}")
+    full_df = fill_empty_row_values(combined_df, get_ckps(source))
+    empty_list_count = full_df.stack().map(is_empty_list).sum()
+    print(f"Number of cells containing empty lists (post fill): {empty_list_count}")
+    fixed_df = flatten_kit_feature_columns(full_df, get_ckps(source))
+    cleaned = drop_empty_list_columns(fixed_df)
+    return cleaned
+
+
+def create_full_user_platform_and_sessions_table(source: CKP_SOURCE):
+    rows = []
+    for i in tqdm(all_ids()):
+        for j in range(1, 4):
+            for k in range(1, 7):
+                df = get_user_by_platform(i, j, k)
+                if df.empty:
+                    print(
+                        f"Skipping User: {i}, platform: {map_platform_id_to_initial(j)}, session: {k}"
+                    )
+                    continue
+                print(
+                    f"User: {i}, platform: {map_platform_id_to_initial(j)}, session: {k}"
+                )
+                table = KeystrokeFeatureTable()
+                table.find_kit_from_most_common_keypairs(df, source)
+                table.find_deft_for_df(df=df)
+                table.add_user_platform_session_identifiers(i, j, k)
+
+                row = table.as_df()
+                rows.append(row)
+    return rows
+
+
+def create_custom_user_platform_and_sessions_table(
+    user_id, platform_id, session_id, source: CKP_SOURCE
+):
+    rows = []
+    df = get_user_by_platform(user_id, platform_id, session_id)
+    if df.empty:
+        print(
+            f"Skipping User: {user_id}, platform: {map_platform_id_to_initial(platform_id)}, session: {session_id}"
+        )
+        return []
+    print(
+        f"User: {user_id}, platform: {map_platform_id_to_initial(platform_id)}, session: {session_id}"
+    )
+    table = KeystrokeFeatureTable()
+    table.find_kit_from_most_common_keypairs(df, source)
+    table.find_deft_for_df(df=df)
+    table.add_user_platform_session_identifiers(user_id, platform_id, session_id)
+
+    row = table.as_df()
+    rows.append(row)
+    return rows
+
+
+def create_full_user_and_platform_table(source: CKP_SOURCE):
+    rows = []
+    for i in tqdm(all_ids()):
+        for j in range(1, 4):
+            df = get_user_by_platform(i, j)
+            if df.empty:
+                print(f"Skipping User: {i}, platform: {map_platform_id_to_initial(j)}")
+                continue
+            print(f"User: {i}, platform: {map_platform_id_to_initial(j)}")
+            table = KeystrokeFeatureTable()
+            table.find_kit_from_most_common_keypairs(df, source)
+            # table.find_deft_for_df(df=df)
+            table.add_user_platform_session_identifiers(i, j, None)
+
+            row = table.as_df()
+            rows.append(row)
+    return rows

@@ -1,11 +1,12 @@
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import spacy
 
 
 # https://stackoverflow.com/questions/18172851/deleting-dataframe-row-in-pandas-based-on-column-value
-def remove_invalid_keystrokes(df):
+def remove_invalid_keystrokes(df: pd.DataFrame) -> pd.DataFrame:
     """
     A helper function that takes as input a dataframe, and returns a new dataframe
     no longer containing rows with the string "<0>".
@@ -68,9 +69,15 @@ class SentenceParser:
             },
         )
 
+    def letters_from_df(self, input: pd.DataFrame, as_list: bool = False):
+        if as_list is True:
+            return list(remove_invalid_keystrokes(input).iloc[:, 0])
+        elif as_list is False:
+            return remove_invalid_keystrokes(input)
+
     def letters(self, as_list: bool = False):
         if as_list is True:
-            return list(remove_invalid_keystrokes(self.as_df()).iloc[:, 1])
+            return list(remove_invalid_keystrokes(self.as_df()).iloc[:, 0])
         elif as_list is False:
             return remove_invalid_keystrokes(self.as_df())
 
@@ -82,6 +89,9 @@ class SentenceParser:
         for token in doc:
             tokenized_words.append(token.text)
         return tokenized_words
+
+    def as_sentence(self, letters):
+        return reconstruct_text(letters)
 
 
 def reconstruct_text(key_presses):
