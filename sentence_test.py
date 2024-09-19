@@ -307,4 +307,9 @@ def recon_test():
             print()
 
 
-full_wmd()
+sp = SentenceParser(os.path.join(os.getcwd(), "cleaned2.csv"))
+df = get_user_by_platform(1, 1, 3)
+print(df)
+key_set = list(df["key"])
+text = sp.as_sentence(key_set)
+print(text)
