@@ -365,6 +365,23 @@ def all_ids():
     return [num for num in range(1, 26) if num != 22]
 
 
+def all_ids_with_full_platforms():
+    df = read_compact_format()
+    complete_ids = []
+    for i in all_ids():
+        skip_user = False  # Flag to determine if we should skip this user
+        for j in range(1, 4):
+            df = get_user_by_platform(i, j)
+            if df.empty:
+                print(f"Skipping User: {i}, platform: {map_platform_id_to_initial(j)}")
+                skip_user = True  # Set the flag to skip the user
+                break  # Exit the inner loop
+        if skip_user:
+            continue  # Skip to the next iteration of the outer loop
+        complete_ids.append(i)
+    return complete_ids
+
+
 def create_feature_dataframe(df, kht_func, kit_func, feature_types):
     """
     Create a dataframe with the features using KHT and KIT data.

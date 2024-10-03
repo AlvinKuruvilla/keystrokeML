@@ -3,3 +3,4 @@ train_images/
 test_images
 *.dat
 catboost_info
+*.png
