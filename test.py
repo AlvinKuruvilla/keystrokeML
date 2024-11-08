@@ -1,4 +1,4 @@
-from core.utils import get_user_by_platform_from_df, read_compact_format
+from core.utils import all_ids_with_full_platforms, read_compact_format
 
 
 def user_platform_count():
@@ -7,5 +7,4 @@ def user_platform_count():
     print(mapping)
 
 
-df = read_compact_format()
-print(get_user_by_platform_from_df(df, 1, 1))
+print(all_ids_with_full_platforms())

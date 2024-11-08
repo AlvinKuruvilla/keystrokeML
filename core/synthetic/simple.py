@@ -16,10 +16,6 @@ def generate_keystroke_sequence(sequence_length):
     return keycodes, press_times, release_times
 
 
-def get_sub_df_by_user_id(df: pd.DataFrame, user_id):
-    return df[df["user_id"] == user_id]
-
-
 def extract_features(df):
     df["HL"] = df["release_time"] - df["press_time"]
 

@@ -8,51 +8,6 @@ from sklearn.preprocessing import LabelEncoder
 import numpy as np
 import os
 
-# Load the dataset
-data = pd.read_csv(
-    os.path.join(os.getcwd(), "dataset", "synthetic_keystroke_data.csv"),
-)
-
-# Extract temporal features
-data["hold_latency"] = data["release_time"] - data["press_time"]
-data["press_latency"] = data.groupby("seq_id")["press_time"].diff().fillna(0)
-data["release_latency"] = data.groupby("seq_id")["release_time"].diff().fillna(0)
-data["inner_key_latency"] = (
-    data.groupby("seq_id")["press_time"].shift(-1) - data["release_time"]
-)
-data["outer_key_latency"] = data["press_time"] - data.groupby("seq_id")[
-    "release_time"
-].shift(1)
-
-# Replace NaN values created by shift with 0
-data.fillna(0, inplace=True)
-
-# Create feature vectors for each sequence (grouped by 'seq_id')
-features = data.groupby("seq_id").apply(
-    lambda x: x[
-        [
-            "hold_latency",
-            "press_latency",
-            "release_latency",
-            "inner_key_latency",
-            "outer_key_latency",
-        ]
-    ].values
-)
-labels = data.groupby("seq_id")["user_id"].first().values
-
-# Convert features to a suitable format for the model (padding sequences to the same length)
-max_seq_length = max(map(len, features))
-feature_dim = features[0].shape[1]
-padded_features = np.zeros((len(features), max_seq_length, feature_dim))
-
-for i, seq in enumerate(features):
-    padded_features[i, : len(seq), :] = seq
-
-# Encode labels
-label_encoder = LabelEncoder()
-encoded_labels = label_encoder.fit_transform(labels)
-
 
 class KeystrokeDataset(Dataset):
     def __init__(self, features, labels):
@@ -64,10 +19,6 @@ class KeystrokeDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.features[idx], self.labels[idx]
-
-
-dataset = KeystrokeDataset(padded_features, encoded_labels)
-dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
 
 class TransformerEncoder(nn.Module):
@@ -155,10 +106,9 @@ def train_model(model, dataloader, optimizer, margin=1.0, epochs=3):
                 optimizer.step()
                 total_loss += total_batch_loss.item()
 
-            # Calculate accuracy for the batch
-            positive_distances = F.pairwise_distance(embedding_A, embedding_B)
-            negative_distances = torch.stack(
-                [
+                # Calculate accuracy for the batch
+                positive_distances = F.pairwise_distance(embedding_A, embedding_B)
+                negative_distances_list = [
                     F.pairwise_distance(
                         embedding_A[i].unsqueeze(0), embedding_B[j].unsqueeze(0)
                     )
@@ -166,21 +116,75 @@ def train_model(model, dataloader, optimizer, margin=1.0, epochs=3):
                     for j in range(embedding_B.size(0))
                     if i != j
                 ]
-            )
+                if negative_distances_list:
+                    negative_distances = torch.stack(negative_distances_list)
+                    positive_predictions = (positive_distances < margin).float()
+                    negative_predictions = (negative_distances >= margin).float()
+                    correct_predictions += (
+                        positive_predictions.sum() + negative_predictions.sum()
+                    ).item()
+                    total_samples += positive_predictions.size(
+                        0
+                    ) + negative_predictions.size(0)
+                else:
+                    print("No valid negative distances found.")
+            else:
+                print("No valid triplets found.")
 
-            positive_predictions = (positive_distances < margin).float()
-            negative_predictions = (negative_distances >= margin).float()
-            correct_predictions += (
-                positive_predictions.sum() + negative_predictions.sum()
-            ).item()
-            total_samples += positive_predictions.size(0) + negative_predictions.size(0)
-
-        accuracy = correct_predictions / total_samples
-        avg_loss = total_loss / len(dataloader)
+        accuracy = correct_predictions / total_samples if total_samples > 0 else 0
+        avg_loss = total_loss / len(dataloader) if len(dataloader) > 0 else 0
 
         print(
             f"Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Accuracy: {accuracy:.4f}"
         )
+
+
+# Load the dataset
+data = pd.read_csv(
+    os.path.join(os.getcwd(), "dataset", "synthetic_keystroke_data_small.csv"),
+)
+
+# Extract temporal features
+data["hold_latency"] = data["release_time"] - data["press_time"]
+data["press_latency"] = data.groupby("seq_id")["press_time"].diff().fillna(0)
+data["release_latency"] = data.groupby("seq_id")["release_time"].diff().fillna(0)
+data["inner_key_latency"] = (
+    data.groupby("seq_id")["press_time"].shift(-1) - data["release_time"]
+)
+data["outer_key_latency"] = data["press_time"] - data.groupby("seq_id")[
+    "release_time"
+].shift(1)
+
+# Replace NaN values created by shift with 0
+data.fillna(0, inplace=True)
+
+# Create feature vectors for each sequence (grouped by 'seq_id')
+features = data.groupby("seq_id").apply(
+    lambda x: x[
+        [
+            "hold_latency",
+            "press_latency",
+            "release_latency",
+            "inner_key_latency",
+            "outer_key_latency",
+        ]
+    ].values
+)
+labels = data.groupby("seq_id")["user_id"].first().values
+
+# Convert features to a suitable format for the model (padding sequences to the same length)
+max_seq_length = max(map(len, features))
+feature_dim = features[0].shape[1]
+padded_features = np.zeros((len(features), max_seq_length, feature_dim))
+
+for i, seq in enumerate(features):
+    padded_features[i, : len(seq), :] = seq
+
+# Encode labels
+label_encoder = LabelEncoder()
+encoded_labels = label_encoder.fit_transform(labels)
+dataset = KeystrokeDataset(padded_features, encoded_labels)
+dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
 
 # Initialize model, optimizer

@@ -15,7 +15,7 @@ from core.bigrams import (
 )
 from core.deft import find_avg_deft_for_deft_distance_and_kit_feature, flatten_list
 from core.utils import (
-    all_ids,
+    all_ids_with_full_platforms,
     clean_string,
     create_kit_data_from_df,
     get_user_by_platform,
@@ -249,7 +249,7 @@ def table_to_cleaned_df(table, source: CKP_SOURCE):
 
 def create_full_user_platform_and_sessions_table(source: CKP_SOURCE):
     rows = []
-    for i in tqdm(all_ids()):
+    for i in tqdm(all_ids_with_full_platforms()):
         for j in range(1, 4):
             for k in range(1, 7):
                 df = get_user_by_platform(i, j, k)
@@ -296,7 +296,7 @@ def create_custom_user_platform_and_sessions_table(
 
 def create_full_user_and_platform_table(source: CKP_SOURCE):
     rows = []
-    for i in tqdm(all_ids()):
+    for i in tqdm(all_ids_with_full_platforms()):
         for j in range(1, 4):
             df = get_user_by_platform(i, j)
             if df.empty:
@@ -311,3 +311,9 @@ def create_full_user_and_platform_table(source: CKP_SOURCE):
             row = table.as_df()
             rows.append(row)
     return rows
+
+
+def serialize_table(source: CKP_SOURCE, filename="features_data.csv"):
+    rows = create_full_user_and_platform_table(source)
+    cleaned = table_to_cleaned_df(rows, source)
+    cleaned.to_csv(filename)

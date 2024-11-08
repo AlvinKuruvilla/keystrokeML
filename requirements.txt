@@ -13,3 +13,4 @@ POT
 tensorflow-hub
 faiss-cpu
 xgboost
+bob.measure

@@ -1,3 +1,6 @@
+# Stuff for next week:
+# 1. Focus on just extracting features with the transformer - understand the model fully
+# 2 Combine with the classicial keystroke features
 from itertools import combinations_with_replacement
 import torch
 import pandas as pd
