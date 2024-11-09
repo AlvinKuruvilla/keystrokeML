@@ -7,10 +7,16 @@ from catboost import CatBoostClassifier, Pool
 import pandas as pd
 from sklearn.model_selection import (
     GridSearchCV,
-    LeaveOneOut,
     StratifiedKFold,
 )
-from sklearn.metrics import accuracy_score, classification_report, top_k_accuracy_score
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    f1_score,
+    precision_score,
+    recall_score,
+    top_k_accuracy_score,
+)
 from xgboost import XGBClassifier, plot_importance
 import matplotlib.pyplot as plt
 import numpy as np
@@ -60,7 +66,42 @@ def flatten_column(df, column_name):
     return df
 
 
-# TODO: Eventually I want to replace LOO with StratifiedKFold but not now
+def analyze_top_k_distribution(y_test_encoded, y_pred_proba_xgb, label_encoder):
+    # Convert encoded labels back to original for readability
+    y_test_decoded = label_encoder.inverse_transform(y_test_encoded)
+
+    # Create a DataFrame to store results
+    analysis_df = pd.DataFrame(
+        {"True Label": y_test_decoded, "True Label Encoded": y_test_encoded}
+    )
+
+    # Rank each probability for each sample and locate the rank of the true label
+    true_label_ranks = []
+    for i, true_label in enumerate(y_test_encoded):
+        sorted_indices = np.argsort(
+            -y_pred_proba_xgb[i]
+        )  # Sort probabilities in descending order
+        true_label_rank = (
+            np.where(sorted_indices == true_label)[0][0] + 1
+        )  # Get 1-based rank of true label
+        true_label_ranks.append(true_label_rank)
+
+    # Add ranks to the DataFrame
+    analysis_df["True Label Rank"] = true_label_ranks
+
+    # Display distribution of ranks to see where the true label typically falls
+    rank_distribution = analysis_df["True Label Rank"].value_counts().sort_index()
+    print("True Label Rank Distribution:\n", rank_distribution)
+
+    # Display average and median rank for additional insight
+    avg_rank = analysis_df["True Label Rank"].mean()
+    median_rank = analysis_df["True Label Rank"].median()
+    print(f"\nAverage Rank of True Labels: {avg_rank:.2f}")
+    print(f"Median Rank of True Labels: {median_rank}")
+
+    return analysis_df
+
+
 def run_xgboost_model(X_train, X_test, y_train, y_test, max_k=5):
     # Scale the features
     scaler = ExtendedMinMaxScalar()
@@ -72,8 +113,7 @@ def run_xgboost_model(X_train, X_test, y_train, y_test, max_k=5):
     y_train_encoded = label_encoder.fit_transform(y_train)
     y_test_encoded = label_encoder.transform(y_test)
 
-    # Use Leave-One-Out Cross-Validation
-    loo = LeaveOneOut()
+    stratified_kfold = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
 
     param_grid = {
         "n_estimators": [100, 200, 300],
@@ -86,7 +126,12 @@ def run_xgboost_model(X_train, X_test, y_train, y_test, max_k=5):
 
     # Perform grid search with LOO
     grid_search_xgb = GridSearchCV(
-        XGBClassifier(), param_grid, scoring="accuracy", cv=loo, n_jobs=-1, verbose=1
+        XGBClassifier(),
+        param_grid,
+        scoring="accuracy",
+        cv=stratified_kfold,
+        n_jobs=-1,
+        verbose=1,
     )
     grid_search_xgb.fit(X_train_scaled, y_train_encoded)
 
@@ -129,6 +174,14 @@ def run_xgboost_model(X_train, X_test, y_train, y_test, max_k=5):
     # Calculate recognition rate at rank 1
     recognition_rate = bob.measure.recognition_rate(rr_scores, rank=1)
     print(f"Recognition Rate at rank 1: {recognition_rate:.2f}")
+    analyze_top_k_distribution(y_test_encoded, y_pred_proba_xgb, label_encoder)
+    f1 = f1_score(y_test, y_pred_xgb_decoded, average="weighted")
+    precision = precision_score(y_test, y_pred_xgb_decoded, average="weighted")
+    recall = recall_score(y_test, y_pred_xgb_decoded, average="weighted")
+
+    print(f"F1 Score: {f1}")
+    print(f"Precision: {precision}")
+    print(f"Recall: {recall}")
 
     # Plot feature importance
     if config["draw_feature_importance_graph"]:
@@ -234,7 +287,7 @@ def run_random_forest_model(X_train, X_test, y_train, y_test, max_k=5):
 
 def run_catboost_model(X_train, X_test, y_train, y_test, max_k=5):
     # Scale the features
-    scaler = ExtendedMinMaxScalar()
+    scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
@@ -332,6 +385,8 @@ def run_catboost_model(X_train, X_test, y_train, y_test, max_k=5):
         plt.savefig("Catboost Feature Importance.png")
 
 
+# print(df.columns)
+# input("Printing dataframe columns")
 # Columns to deserialize
 # TODO: We need a more generic way to deserialize columns
 columns_to_deserialize = [
@@ -341,15 +396,15 @@ columns_to_deserialize = [
     "on",
     "es",
     "te",
+    "at",
+    "al",
+    "an",
+    "re",
     "en",
     "is",
     "ic",
     "ri",
     "ra",
-    "at",
-    "al",
-    "an",
-    "re",
 ]
 
 # Apply deserialization and flattening to each relevant column
@@ -366,10 +421,20 @@ df["platform_id"] = df["platform_id"].apply(
 )
 df.to_csv("cleaned_features_data.csv")
 
-X_train = df[df["platform_id"].isin([1, 2])].drop(columns=["user_id", "platform_id"])
-y_train = df[df["platform_id"].isin([1, 2])]["user_id"]
-
+X_train = df[df["platform_id"].isin([2, 3])].drop(columns=["user_id", "platform_id"])
+y_train = df[df["platform_id"].isin([2, 3])]["user_id"]
 # Test Data: Users from platform 3
-X_test = df[df["platform_id"] == 3].drop(columns=["user_id", "platform_id"])
-y_test = df[df["platform_id"] == 3]["user_id"]
-run_catboost_model(X_train, X_test, y_train, y_test, 5)
+X_test = df[df["platform_id"] == 1].drop(columns=["user_id", "platform_id"])
+y_test = df[df["platform_id"] == 1]["user_id"]
+y_train.value_counts().plot(kind="bar")
+plt.title("Class Distribution in Training Set")
+plt.xlabel("Classes")
+plt.ylabel("Frequency")
+plt.show()
+y_test.value_counts().plot(kind="bar")
+plt.title("Class Distribution in Test Set")
+plt.xlabel("Classes")
+plt.ylabel("Frequency")
+plt.show()
+
+# run_xgboost_model(X_train, X_test, y_train, y_test, 5)
